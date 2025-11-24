@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-gradient-to-br from-baby-pink via-white to-baby-blue;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-r from-pink-400 to-pink-500 hover:from-pink-500 hover:to-pink-600 text-white font-accent font-semibold px-8 py-4 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-pink-500 font-accent font-semibold px-8 py-4 rounded-full shadow-lg hover:shadow-xl border-2 border-pink-300 hover:border-pink-400 transform hover:scale-105 transition-all duration-300 text-lg;
+  }
+
+  .section-title {
+    @apply font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-gray-800 mb-6;
+  }
+
+  .section-subtitle {
+    @apply font-body text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto;
+  }
+
+  .card {
+    @apply bg-white rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 1s ease-in forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
