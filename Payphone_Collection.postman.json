@@ -1,0 +1,190 @@
+{
+  "info": {
+    "name": "Payphone - BebéSeguro",
+    "description": "Colección para probar la integración con Payphone",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Payphone API Direct",
+      "item": [
+        {
+          "name": "Create Payment Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{PAYPHONE_BEARER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 45.99,\n  \"amountWithoutTax\": 45.99,\n  \"amountWithTax\": 0,\n  \"currency\": \"USD\",\n  \"service\": 0,\n  \"tip\": 0,\n  \"reference\": \"BB-TEST-001\",\n  \"clientTransactionId\": \"BB-TEST-001\",\n  \"email\": \"test@example.com\",\n  \"phoneNumber\": \"+593991234567\",\n  \"responseUrl\": \"https://tienda-bb-seguro.netlify.app/checkout\",\n  \"cancellationUrl\": \"https://tienda-bb-seguro.netlify.app/checkout\",\n  \"storeId\": \"ac6fce98-3294-45bd-8f16-c1e64d5bb492\"\n}"
+            },
+            "url": {
+              "raw": "https://pay.payphonetodoesposible.com/api/button/Prepare",
+              "protocol": "https",
+              "host": [
+                "pay",
+                "payphonetodoesposible",
+                "com"
+              ],
+              "path": [
+                "api",
+                "button",
+                "Prepare"
+              ]
+            },
+            "description": "Crea un link de pago directamente con la API de Payphone"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Transaction Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{PAYPHONE_BEARER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"TRANSACTION_ID_AQUI\",\n  \"storeId\": \"ac6fce98-3294-45bd-8f16-c1e64d5bb492\"\n}"
+            },
+            "url": {
+              "raw": "https://pay.payphonetodoesposible.com/api/Sale/Confirm",
+              "protocol": "https",
+              "host": [
+                "pay",
+                "payphonetodoesposible",
+                "com"
+              ],
+              "path": [
+                "api",
+                "Sale",
+                "Confirm"
+              ]
+            },
+            "description": "Verifica el estado de una transacción de Payphone"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Local Next.js API",
+      "item": [
+        {
+          "name": "Create Payment (Local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 45.99,\n  \"orderId\": \"BB-TEST-001\",\n  \"clientName\": \"María González\",\n  \"clientEmail\": \"maria@example.com\",\n  \"clientPhone\": \"+593991234567\",\n  \"address\": \"Av. Amazonas y Naciones Unidas\",\n  \"city\": \"Quito\",\n  \"items\": [\n    {\n      \"name\": \"Casco para Bebé Clásico\",\n      \"quantity\": 1,\n      \"price\": \"45.99\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/payphone/create",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "payphone",
+                "create"
+              ]
+            },
+            "description": "Prueba la API local de Next.js que crea pagos con Payphone"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Payment - Multiple Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 91.98,\n  \"orderId\": \"BB-TEST-002\",\n  \"clientName\": \"Juan Pérez\",\n  \"clientEmail\": \"juan@example.com\",\n  \"clientPhone\": \"+593987654321\",\n  \"address\": \"Calle García Moreno y Sucre\",\n  \"city\": \"Quito\",\n  \"items\": [\n    {\n      \"name\": \"Casco para Bebé Clásico\",\n      \"quantity\": 1,\n      \"price\": \"45.99\"\n    },\n    {\n      \"name\": \"Casco para Bebé Premium\",\n      \"quantity\": 1,\n      \"price\": \"45.99\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/payphone/create",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "payphone",
+                "create"
+              ]
+            },
+            "description": "Prueba con múltiples items en el carrito"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Production API",
+      "item": [
+        {
+          "name": "Create Payment (Production)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 45.99,\n  \"orderId\": \"BB-PROD-001\",\n  \"clientName\": \"Cliente Real\",\n  \"clientEmail\": \"cliente@example.com\",\n  \"clientPhone\": \"+593991234567\",\n  \"address\": \"Dirección del cliente\",\n  \"city\": \"Quito\",\n  \"items\": [\n    {\n      \"name\": \"Casco para Bebé\",\n      \"quantity\": 1,\n      \"price\": \"45.99\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "https://tienda-bb-seguro.netlify.app/api/payphone/create",
+              "protocol": "https",
+              "host": [
+                "tienda-bb-seguro",
+                "netlify",
+                "app"
+              ],
+              "path": [
+                "api",
+                "payphone",
+                "create"
+              ]
+            },
+            "description": "Prueba la API en producción (Netlify)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

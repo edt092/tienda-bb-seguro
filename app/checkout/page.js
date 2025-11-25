@@ -97,7 +97,7 @@ export default function CheckoutPage() {
         // Guardar información del pedido en localStorage antes de redirigir
         localStorage.setItem('pendingOrder', JSON.stringify({
           orderId: orderId,
-          transactionId: result.transactionId,
+          paymentId: result.paymentId,
           ...orderData
         }))
 
