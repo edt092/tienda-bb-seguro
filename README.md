@@ -233,12 +233,50 @@ Todos soportan Next.js 14 nativamente.
 - **React Icons** - Iconos
 - **Context API** - Estado global
 
+## 🧪 Pruebas con Postman
+
+Este proyecto incluye una colección de Postman (`Payphone_Collection.postman.json`) para probar la integración con Payphone.
+
+### Configurar Variables de Postman:
+
+**IMPORTANTE**: La colección usa variables de entorno para mantener las credenciales seguras. Nunca agregues tokens reales al archivo de colección.
+
+1. **Abrir Postman** y importar `Payphone_Collection.postman.json`
+
+2. **Crear un Environment** en Postman:
+   - Click en "Environments" (ícono de engranaje)
+   - Click en "Create Environment" o "Add"
+   - Nombre: `Payphone - BebéSeguro`
+
+3. **Agregar la variable**:
+   - Variable: `PAYPHONE_BEARER_TOKEN`
+   - Type: `secret` (para ocultar el valor)
+   - Initial Value: (dejar vacío)
+   - Current Value: `tu_token_de_payphone_aqui`
+
+4. **Seleccionar el Environment**:
+   - En el dropdown de environments (esquina superior derecha)
+   - Selecciona "Payphone - BebéSeguro"
+
+5. **Usar la colección**:
+   - Ahora puedes usar las requests en la colección
+   - El token se insertará automáticamente desde la variable de entorno
+
+### Obtener tu Bearer Token de Payphone:
+1. Inicia sesión en tu cuenta de Payphone
+2. Ve a la sección de API/Desarrolladores
+3. Copia tu token de autenticación
+4. Pégalo en la variable `PAYPHONE_BEARER_TOKEN` en Postman
+
+**NUNCA** compartas tu token de Payphone o lo agregues directamente en archivos que serán subidos a GitHub.
+
 ## 📝 Notas Importantes
 
 1. **Imágenes**: Debes agregar tus propias imágenes en `/public/img/`
 2. **Video**: El video del hero debe estar optimizado (máx 5MB recomendado)
 3. **SEO**: Actualiza metadata en `/app/layout.js` según tu negocio
 4. **Legal**: Agrega páginas de términos y condiciones según legislación local
+5. **Seguridad**: Nunca subas tokens o credenciales a Git. Usa variables de entorno (.env) o variables de Postman
 
 ## 🤝 Soporte
 
