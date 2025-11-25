@@ -41,7 +41,9 @@ export default function RootLayout({ children }) {
         </CartProvider>
         <Script
           src="https://cdn.payphonetodoesposible.com/box/v1.1/payphone-payment-box.js"
-          strategy="lazyOnload"
+          strategy="afterInteractive"
+          onLoad={() => console.log('✅ Payphone SDK cargado')}
+          onError={() => console.error('❌ Error cargando Payphone SDK')}
         />
       </body>
     </html>

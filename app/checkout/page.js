@@ -12,6 +12,8 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
   const [paymentFailed, setPaymentFailed] = useState(false)
+  const [sdkLoading, setSdkLoading] = useState(true)
+  const [sdkError, setSdkError] = useState(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -100,7 +102,25 @@ export default function CheckoutPage() {
 
   // Inicializar Payphone SDK cuando el formulario es válido
   useEffect(() => {
-    if (!formValid || typeof window === 'undefined') return
+    if (!formValid || typeof window === 'undefined') {
+      setSdkLoading(false)
+      return
+    }
+
+    // Verificar que las variables de entorno estén configuradas
+    const token = process.env.NEXT_PUBLIC_PAYPHONE_TOKEN
+    const storeId = process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID
+
+    console.log('🔍 Verificando configuración de Payphone:')
+    console.log('- Token presente:', !!token)
+    console.log('- Store ID presente:', !!storeId)
+
+    if (!token || !storeId) {
+      console.error('❌ Variables de entorno no configuradas')
+      setSdkError('Variables de entorno de Payphone no configuradas')
+      setSdkLoading(false)
+      return
+    }
 
     // Generar ID único para el pedido
     const newOrderId = `BB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -125,6 +145,8 @@ export default function CheckoutPage() {
     const initPayphone = () => {
       if (window.PPaymentButtonBox) {
         try {
+          console.log('🚀 Inicializando SDK de Payphone...')
+
           // Limpiar el contenedor antes de renderizar
           const container = document.getElementById('pp-button')
           if (container) {
@@ -133,7 +155,7 @@ export default function CheckoutPage() {
 
           // Configurar Payphone SDK
           const ppb = new window.PPaymentButtonBox({
-            token: process.env.NEXT_PUBLIC_PAYPHONE_TOKEN,
+            token: token,
             clientTransactionId: newOrderId,
             amount: amountInCents,
             amountWithoutTax: 0,
@@ -142,7 +164,7 @@ export default function CheckoutPage() {
             service: 0,
             tip: 0,
             currency: "USD",
-            storeId: process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID,
+            storeId: storeId,
             reference: `Pedido BebéSeguro ${newOrderId}`,
             lang: "es",
             defaultMethod: "card",
@@ -150,34 +172,51 @@ export default function CheckoutPage() {
             email: formData.email
           })
 
+          console.log('✅ SDK configurado, renderizando botón...')
           ppb.render('pp-button')
+          setSdkLoading(false)
+          setSdkError(null)
+          console.log('✅ Botón de Payphone renderizado exitosamente')
         } catch (error) {
-          console.error('Error al inicializar Payphone:', error)
+          console.error('❌ Error al inicializar Payphone:', error)
+          setSdkError(error.message)
+          setSdkLoading(false)
         }
+      } else {
+        console.warn('⏳ SDK de Payphone aún no está disponible')
       }
     }
 
     // Verificar si el SDK ya está cargado
     if (window.PPaymentButtonBox) {
+      console.log('✅ SDK de Payphone ya está disponible')
       initPayphone()
     } else {
-      // Si no está cargado, esperar al evento DOMContentLoaded
-      if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', initPayphone)
-        return () => window.removeEventListener('DOMContentLoaded', initPayphone)
-      } else {
-        // Si el DOM ya está listo, esperar un poco más
-        const checkInterval = setInterval(() => {
-          if (window.PPaymentButtonBox) {
-            clearInterval(checkInterval)
-            initPayphone()
-          }
-        }, 100)
+      console.log('⏳ Esperando a que se cargue el SDK de Payphone...')
+      setSdkLoading(true)
 
-        // Timeout después de 5 segundos
-        setTimeout(() => clearInterval(checkInterval), 5000)
+      // Esperar un poco más para que el script se cargue
+      const checkInterval = setInterval(() => {
+        if (window.PPaymentButtonBox) {
+          console.log('✅ SDK de Payphone detectado')
+          clearInterval(checkInterval)
+          initPayphone()
+        }
+      }, 200)
 
-        return () => clearInterval(checkInterval)
+      // Timeout después de 10 segundos
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval)
+        if (!window.PPaymentButtonBox) {
+          console.error('❌ Timeout: SDK de Payphone no se cargó en 10 segundos')
+          setSdkError('El SDK de Payphone no se pudo cargar. Por favor recarga la página.')
+          setSdkLoading(false)
+        }
+      }, 10000)
+
+      return () => {
+        clearInterval(checkInterval)
+        clearTimeout(timeout)
       }
     }
   }, [formValid, formData, total, cart])
@@ -473,6 +512,34 @@ export default function CheckoutPage() {
                   <p className="text-sm text-yellow-800 font-body">
                     ℹ️ Completa todos los campos obligatorios (*) para continuar con el pago
                   </p>
+                </div>
+              )}
+
+              {/* Mensajes de estado del SDK */}
+              {formValid && sdkLoading && (
+                <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <p className="text-sm text-blue-800 font-body">
+                    Cargando métodos de pago...
+                  </p>
+                </div>
+              )}
+
+              {formValid && sdkError && (
+                <div className="mt-6 bg-red-50 rounded-xl p-4 border border-red-200">
+                  <p className="text-sm text-red-800 font-body font-semibold mb-2">
+                    ❌ Error al cargar el botón de pago
+                  </p>
+                  <p className="text-xs text-red-700 font-body mb-3">
+                    {sdkError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="text-xs bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Recargar página
+                  </button>
                 </div>
               )}
 
