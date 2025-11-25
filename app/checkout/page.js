@@ -31,23 +31,49 @@ export default function CheckoutPage() {
     const clientTransactionId = searchParams.get('clientTransactionId')
     const id = searchParams.get('id') // Transaction ID de Payphone
 
-    if (clientTransactionId || id) {
-      // El usuario regresó de Payphone
-      const pendingOrder = localStorage.getItem('pendingOrder')
+    if (clientTransactionId && id) {
+      // El usuario regresó de Payphone - confirmar el estado
+      const confirmTransaction = async () => {
+        try {
+          setIsProcessing(true)
 
-      if (pendingOrder) {
-        const orderData = JSON.parse(pendingOrder)
+          // Llamar al endpoint de confirmación
+          const response = await fetch('/api/payphone/confirm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              id: id,
+              clientTxId: clientTransactionId
+            })
+          })
 
-        // Verificar si el pago fue exitoso
-        // En Payphone, si regresa con parámetros significa que completó el proceso
-        // Nota: Deberías verificar el estado real con la API en producción
-        setOrderComplete(true)
-        clearCart()
-        localStorage.removeItem('pendingOrder')
+          const result = await response.json()
 
-        // Limpiar los parámetros de la URL
-        router.replace('/checkout', { scroll: false })
+          if (result.success && result.status === 3) {
+            // Pago aprobado
+            setOrderComplete(true)
+            clearCart()
+            localStorage.removeItem('pendingOrder')
+          } else {
+            // Pago no aprobado (cancelado, rechazado, etc.)
+            setPaymentFailed(true)
+            console.error('Pago no aprobado:', result)
+          }
+
+          // Limpiar los parámetros de la URL
+          router.replace('/checkout', { scroll: false })
+
+        } catch (error) {
+          console.error('Error al confirmar transacción:', error)
+          setPaymentFailed(true)
+        } finally {
+          setIsProcessing(false)
+        }
       }
+
+      confirmTransaction()
     }
   }, [searchParams, clearCart, router])
 
@@ -58,62 +84,108 @@ export default function CheckoutPage() {
     })
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsProcessing(true)
+  // Validar formulario y mostrar botón de pago
+  const [formValid, setFormValid] = useState(false)
+  const [orderId, setOrderId] = useState('')
 
-    try {
-      // Generar ID único para el pedido
-      const orderId = `BB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  // Validar formulario
+  useEffect(() => {
+    const isValid = formData.name &&
+                   formData.email &&
+                   formData.phone &&
+                   formData.address &&
+                   formData.city
+    setFormValid(isValid)
+  }, [formData])
 
-      // Preparar datos del pedido
-      const orderData = {
-        amount: total,
-        orderId: orderId,
-        clientName: formData.name,
-        clientEmail: formData.email,
-        clientPhone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        items: cart.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        }))
+  // Inicializar Payphone SDK cuando el formulario es válido
+  useEffect(() => {
+    if (!formValid || typeof window === 'undefined') return
+
+    // Generar ID único para el pedido
+    const newOrderId = `BB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    setOrderId(newOrderId)
+
+    // Convertir el total a centavos
+    const amountInCents = Math.round(parseFloat(total) * 100)
+
+    // Guardar información del pedido antes de iniciar el pago
+    localStorage.setItem('pendingOrder', JSON.stringify({
+      orderId: newOrderId,
+      ...formData,
+      amount: total,
+      items: cart.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    }))
+
+    // Esperar a que el SDK esté disponible
+    const initPayphone = () => {
+      if (window.PPaymentButtonBox) {
+        try {
+          // Limpiar el contenedor antes de renderizar
+          const container = document.getElementById('pp-button')
+          if (container) {
+            container.innerHTML = ''
+          }
+
+          // Configurar Payphone SDK
+          const ppb = new window.PPaymentButtonBox({
+            token: process.env.NEXT_PUBLIC_PAYPHONE_TOKEN,
+            clientTransactionId: newOrderId,
+            amount: amountInCents,
+            amountWithoutTax: 0,
+            amountWithTax: amountInCents,
+            tax: 0,
+            service: 0,
+            tip: 0,
+            currency: "USD",
+            storeId: process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID,
+            reference: `Pedido BebéSeguro ${newOrderId}`,
+            lang: "es",
+            defaultMethod: "card",
+            phoneNumber: formData.phone,
+            email: formData.email
+          })
+
+          ppb.render('pp-button')
+        } catch (error) {
+          console.error('Error al inicializar Payphone:', error)
+        }
       }
-
-      // Llamar a la API para crear el pago en Payphone
-      const response = await fetch('/api/payphone/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(orderData)
-      })
-
-      const result = await response.json()
-
-      if (result.success && result.paymentUrl) {
-        // Guardar información del pedido en localStorage antes de redirigir
-        localStorage.setItem('pendingOrder', JSON.stringify({
-          orderId: orderId,
-          paymentId: result.paymentId,
-          ...orderData
-        }))
-
-        // Redirigir a Payphone
-        window.location.href = result.paymentUrl
-      } else {
-        // Mostrar error
-        alert(result.message || 'Error al generar el link de pago. Por favor, intenta nuevamente.')
-        setIsProcessing(false)
-      }
-
-    } catch (error) {
-      console.error('Error al procesar el pago:', error)
-      alert('Ocurrió un error al procesar tu pedido. Por favor, intenta nuevamente.')
-      setIsProcessing(false)
     }
+
+    // Verificar si el SDK ya está cargado
+    if (window.PPaymentButtonBox) {
+      initPayphone()
+    } else {
+      // Si no está cargado, esperar al evento DOMContentLoaded
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initPayphone)
+        return () => window.removeEventListener('DOMContentLoaded', initPayphone)
+      } else {
+        // Si el DOM ya está listo, esperar un poco más
+        const checkInterval = setInterval(() => {
+          if (window.PPaymentButtonBox) {
+            clearInterval(checkInterval)
+            initPayphone()
+          }
+        }, 100)
+
+        // Timeout después de 5 segundos
+        setTimeout(() => clearInterval(checkInterval), 5000)
+
+        return () => clearInterval(checkInterval)
+      }
+    }
+  }, [formValid, formData, total, cart])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    // La validación ya se hace automáticamente con useEffect
+    // El botón de Payphone aparecerá cuando el formulario sea válido
   }
 
   if (cart.length === 0 && !orderComplete) {
@@ -134,6 +206,63 @@ export default function CheckoutPage() {
             Ir a Comprar
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (paymentFailed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-baby-pink via-white to-baby-blue flex items-center justify-center px-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-2xl"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring' }}
+            className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6"
+          >
+            <FaTimesCircle className="text-5xl text-red-500" />
+          </motion.div>
+
+          <h1 className="font-heading text-4xl font-bold text-gray-800 mb-4">
+            Pago no completado
+          </h1>
+
+          <p className="text-xl text-gray-600 font-body mb-6">
+            Tu pago no pudo ser procesado o fue cancelado
+          </p>
+
+          <div className="bg-red-50 rounded-2xl p-6 mb-8">
+            <p className="text-gray-700 font-body mb-2">
+              No se ha realizado ningún cargo a tu tarjeta.
+            </p>
+            <p className="text-red-600 font-semibold">
+              Puedes intentar nuevamente cuando estés listo.
+            </p>
+          </div>
+
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={() => {
+                setPaymentFailed(false)
+                router.push('/checkout')
+              }}
+              className="btn-primary"
+            >
+              Intentar de Nuevo
+            </button>
+
+            <button
+              onClick={() => router.push('/')}
+              className="px-6 py-3 bg-gray-200 text-gray-700 font-body font-semibold rounded-xl hover:bg-gray-300 transition-colors"
+            >
+              Volver al Inicio
+            </button>
+          </div>
+        </motion.div>
       </div>
     )
   }
@@ -333,26 +462,24 @@ export default function CheckoutPage() {
 
               <div className="mt-8 bg-blue-50 rounded-2xl p-4">
                 <p className="text-sm text-blue-800 font-body">
-                  <strong>Nota:</strong> Al confirmar tu pedido, serás redirigido a Payphone
-                  para completar el pago de forma segura. Luego de completar el pago,
-                  nos pondremos en contacto contigo para coordinar la entrega.
+                  <strong>Nota:</strong> Completa el formulario para proceder al pago.
+                  El pago se procesa de forma segura con Payphone.
+                  Luego de completar el pago, nos pondremos en contacto contigo para coordinar la entrega.
                 </p>
               </div>
 
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="btn-primary w-full mt-6"
-              >
-                {isProcessing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Procesando...
-                  </span>
-                ) : (
-                  'Confirmar Pedido'
-                )}
-              </button>
+              {!formValid && (
+                <div className="mt-6 bg-yellow-50 rounded-xl p-4 border border-yellow-200">
+                  <p className="text-sm text-yellow-800 font-body">
+                    ℹ️ Completa todos los campos obligatorios (*) para continuar con el pago
+                  </p>
+                </div>
+              )}
+
+              {/* Contenedor del botón de Payphone */}
+              <div className="mt-6">
+                <div id="pp-button"></div>
+              </div>
             </form>
           </div>
 

@@ -2,6 +2,8 @@
 
 Landing page profesional para venta de cascos protectores para bebés, diseñada con Next.js 14, React y Tailwind CSS.
 
+**🌐 En producción**: https://tienda-bb-seguro.netlify.app
+
 ## ✨ Características
 
 - 🎨 Diseño tierno y emocional enfocado en seguridad infantil
@@ -9,15 +11,18 @@ Landing page profesional para venta de cascos protectores para bebés, diseñada
 - 📱 Responsive y mobile-first
 - ⚡ Optimizado con Next.js 14 (App Router)
 - 🎭 Animaciones suaves con Framer Motion
-- 💳 Preparado para integración de pasarela de pago
+- 💳 **Integración completa con Payphone** (SDK Cajita de Pagos)
 - 🚀 Performance optimizado
+- 🔒 Deployado en Netlify con variables de entorno seguras
 
 ## 📋 Requisitos Previos
 
 - Node.js 18.0 o superior
 - npm o yarn
 
-## 🚀 Instalación
+## 🚀 Inicio Rápido
+
+### Desarrollo Local
 
 1. **Clonar o descargar el proyecto**
 
@@ -26,40 +31,73 @@ Landing page profesional para venta de cascos protectores para bebés, diseñada
 npm install
 ```
 
-3. **Ejecutar en modo desarrollo**
+3. **Configurar variables de entorno**
+
+Copia `.env.example` a `.env.local` y completa con tus credenciales:
+
+```bash
+cp .env.example .env.local
+```
+
+Edita `.env.local` con tus valores de Payphone:
+```env
+NEXT_PUBLIC_URL=http://localhost:3000
+NEXT_PUBLIC_PAYPHONE_TOKEN=tu_token
+NEXT_PUBLIC_PAYPHONE_STORE_ID=tu_store_id
+NEXT_PUBLIC_PAYPHONE_RESPONSE_URL=http://localhost:3000/checkout
+PAYPHONE_TOKEN=tu_token
+PAYPHONE_STORE_ID=tu_store_id
+```
+
+4. **Probar conexión con Payphone** (opcional)
+```bash
+node test-payphone.js
+```
+
+5. **Ejecutar en modo desarrollo**
 ```bash
 npm run dev
 ```
 
-4. **Abrir el navegador**
+6. **Abrir el navegador**
 ```
 http://localhost:3000
 ```
+
+### Producción en Netlify
+
+**Guías disponibles**:
+- 🚀 [QUICK_SETUP_NETLIFY.md](./QUICK_SETUP_NETLIFY.md) - Configuración rápida (5 min)
+- 📚 [NETLIFY_ENV_SETUP.md](./NETLIFY_ENV_SETUP.md) - Guía completa paso a paso
+- 🏗️ [PRODUCTION.md](./PRODUCTION.md) - Deployment completo
 
 ## 🏗️ Estructura del Proyecto
 
 ```
 casco-para-bb/
 ├── app/
-│   ├── layout.js          # Layout principal con providers
+│   ├── layout.js          # Layout principal con SDK de Payphone
 │   ├── page.js            # Página de inicio
 │   ├── globals.css        # Estilos globales
-│   └── checkout/
-│       └── page.js        # Página de checkout
+│   ├── checkout/
+│   │   └── page.js        # Página de checkout con Payphone
+│   └── api/
+│       └── payphone/
+│           └── confirm/
+│               └── route.js  # API para confirmar transacciones
 ├── components/
 │   ├── Navbar.js          # Barra de navegación con carrito
-│   ├── Hero.js            # Sección hero con video
-│   ├── ProblemSection.js  # Sección de problemas/dolores
-│   ├── SolutionSection.js # Sección de solución
-│   ├── TestimonialsSection.js # Testimonios
-│   ├── TechnicalSection.js    # Especificaciones técnicas
-│   ├── PricingSection.js  # Precios y paquetes
 │   ├── CartModal.js       # Modal del carrito
 │   └── Footer.js          # Footer
 ├── context/
 │   └── CartContext.js     # Context API para carrito
 ├── public/
 │   └── img/              # Imágenes del sitio
+├── .env.example          # Template de variables de entorno
+├── netlify.toml          # Configuración de Netlify
+├── test-payphone.js      # Script de prueba de Payphone
+├── PRODUCTION.md         # Guía de deployment
+├── PAYPHONE_SDK_CONFIG.md # Documentación de Payphone
 └── package.json
 ```
 
@@ -97,86 +135,48 @@ Los precios están configurados en `/components/PricingSection.js`:
 
 Para modificar precios, edita el array `packages` en `PricingSection.js`.
 
-## 🔌 Integración de Pasarela de Pago
+## 💳 Integración de Payphone
 
-La landing está preparada para integrar cualquier pasarela de pago. Aquí está cómo hacerlo:
+El proyecto está **completamente integrado con Payphone** usando el SDK JavaScript (Cajita de Pagos).
 
-### Para Mercado Pago:
+### Características de la integración:
 
-1. **Instalar SDK**
-```bash
-npm install mercadopago @mercadopago/sdk-react
+- ✅ Botón de pago generado automáticamente
+- ✅ Confirmación de transacciones server-side
+- ✅ Manejo de callbacks y redirects
+- ✅ Soporte para tarjetas y app Payphone
+- ✅ Mensajes de éxito/error
+- ✅ Guardado de información del pedido
+
+### Archivos clave:
+
+1. **`app/layout.js`** - Carga el SDK de Payphone (app/layout.js:36-44)
+2. **`app/checkout/page.js`** - Inicializa el botón de pago (app/checkout/page.js:102-183)
+3. **`app/api/payphone/confirm/route.js`** - Confirma transacciones (app/api/payphone/confirm/route.js:1-107)
+
+### Flujo de pago:
+
+```
+Usuario llena formulario
+    ↓
+Botón de Payphone aparece automáticamente
+    ↓
+Usuario hace clic → Redirige a Payphone
+    ↓
+Usuario completa/cancela el pago
+    ↓
+Payphone redirige de vuelta con parámetros
+    ↓
+API confirma el estado de la transacción
+    ↓
+Se muestra mensaje de éxito o error
 ```
 
-2. **Crear API Route** (`/app/api/create-preference/route.js`):
-```javascript
-import { MercadoPagoConfig, Preference } from 'mercadopago'
+### Documentación:
 
-export async function POST(request) {
-  const client = new MercadoPagoConfig({
-    accessToken: process.env.MP_ACCESS_TOKEN
-  })
-
-  const preference = new Preference(client)
-  const body = await request.json()
-
-  const result = await preference.create({
-    body: {
-      items: body.items,
-      back_urls: {
-        success: `${process.env.NEXT_PUBLIC_URL}/success`,
-        failure: `${process.env.NEXT_PUBLIC_URL}/failure`,
-        pending: `${process.env.NEXT_PUBLIC_URL}/pending`
-      },
-      auto_return: 'approved'
-    }
-  })
-
-  return Response.json({ id: result.id })
-}
-```
-
-3. **Actualizar página de checkout** (`/app/checkout/page.js`):
-
-Reemplaza la función `handleSubmit` con:
-```javascript
-const handleSubmit = async (e) => {
-  e.preventDefault()
-  setIsProcessing(true)
-
-  try {
-    const response = await fetch('/api/create-preference', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: cart.map(item => ({
-          title: item.name,
-          quantity: item.quantity,
-          unit_price: parseFloat(item.price)
-        }))
-      })
-    })
-
-    const { id } = await response.json()
-
-    // Redirigir a Mercado Pago
-    window.location.href = `https://www.mercadopago.com.ec/checkout/v1/redirect?pref_id=${id}`
-  } catch (error) {
-    console.error(error)
-    alert('Error al procesar el pago')
-  }
-}
-```
-
-4. **Configurar variables de entorno** (`.env.local`):
-```
-MP_ACCESS_TOKEN=tu_access_token_aqui
-NEXT_PUBLIC_URL=http://localhost:3000
-```
-
-### Para otras pasarelas:
-
-El flujo es similar. La función `handleSubmit` en `/app/checkout/page.js` es donde debes integrar tu pasarela preferida.
+- [PAYPHONE_SDK_CONFIG.md](./PAYPHONE_SDK_CONFIG.md) - Guía completa de configuración
+- [PRODUCTION.md](./PRODUCTION.md) - Deployment a Netlify
+- `node test-payphone.js` - Script de prueba de conexión
 
 ## 🎨 Personalización
 
@@ -201,28 +201,28 @@ Las fuentes están en `/app/layout.js`:
 ### Copy:
 Todo el texto está en español y se puede editar directamente en cada componente.
 
-## 📦 Build para Producción
+## 📦 Build y Deploy
+
+### Build local
 
 ```bash
 npm run build
 npm start
 ```
 
-## 🚀 Deploy
+### Deploy a Netlify (Configurado)
 
-### Vercel (Recomendado):
-```bash
-npm install -g vercel
-vercel
-```
+El proyecto está configurado para Netlify con `netlify.toml`.
 
-### Otras plataformas:
-- Netlify
-- AWS Amplify
-- Railway
-- Render
+**Guía completa**: [PRODUCTION.md](./PRODUCTION.md)
 
-Todos soportan Next.js 14 nativamente.
+**Pasos rápidos**:
+1. Configura variables de entorno en Netlify
+2. Autoriza tu dominio en Payphone Developer
+3. Push a tu repositorio
+4. Netlify despliega automáticamente
+
+**Sitio en producción**: https://tienda-bb-seguro.netlify.app
 
 ## 🛠️ Tecnologías
 
@@ -233,42 +233,37 @@ Todos soportan Next.js 14 nativamente.
 - **React Icons** - Iconos
 - **Context API** - Estado global
 
-## 🧪 Pruebas con Postman
+## 🧪 Pruebas y Testing
 
-Este proyecto incluye una colección de Postman (`Payphone_Collection.postman.json`) para probar la integración con Payphone.
+### Script de prueba de Payphone
 
-### Configurar Variables de Postman:
+Prueba la conexión con la API de Payphone:
 
-**IMPORTANTE**: La colección usa variables de entorno para mantener las credenciales seguras. Nunca agregues tokens reales al archivo de colección.
+```bash
+node test-payphone.js
+```
 
-1. **Abrir Postman** y importar `Payphone_Collection.postman.json`
+Este script verifica:
+- ✅ Variables de entorno configuradas
+- ✅ Conexión con API de Payphone
+- ✅ Validez del token
+- ✅ Configuración del SDK
 
-2. **Crear un Environment** en Postman:
-   - Click en "Environments" (ícono de engranaje)
-   - Click en "Create Environment" o "Add"
-   - Nombre: `Payphone - BebéSeguro`
+### Prueba manual
 
-3. **Agregar la variable**:
-   - Variable: `PAYPHONE_BEARER_TOKEN`
-   - Type: `secret` (para ocultar el valor)
-   - Initial Value: (dejar vacío)
-   - Current Value: `tu_token_de_payphone_aqui`
+1. Ejecuta el proyecto: `npm run dev`
+2. Agrega un producto al carrito
+3. Ve a checkout
+4. Completa el formulario
+5. Verifica que aparezca el botón de Payphone
+6. Prueba el flujo completo de pago
 
-4. **Seleccionar el Environment**:
-   - En el dropdown de environments (esquina superior derecha)
-   - Selecciona "Payphone - BebéSeguro"
+### Credenciales de Payphone
 
-5. **Usar la colección**:
-   - Ahora puedes usar las requests en la colección
-   - El token se insertará automáticamente desde la variable de entorno
+Obtén tus credenciales en:
+- https://developer.payphone.app
 
-### Obtener tu Bearer Token de Payphone:
-1. Inicia sesión en tu cuenta de Payphone
-2. Ve a la sección de API/Desarrolladores
-3. Copia tu token de autenticación
-4. Pégalo en la variable `PAYPHONE_BEARER_TOKEN` en Postman
-
-**NUNCA** compartas tu token de Payphone o lo agregues directamente en archivos que serán subidos a GitHub.
+**NUNCA** compartas tu token o lo subas a Git. Usa `.env.local` (ignorado por Git).
 
 ## 📝 Notas Importantes
 
@@ -276,13 +271,35 @@ Este proyecto incluye una colección de Postman (`Payphone_Collection.postman.js
 2. **Video**: El video del hero debe estar optimizado (máx 5MB recomendado)
 3. **SEO**: Actualiza metadata en `/app/layout.js` según tu negocio
 4. **Legal**: Agrega páginas de términos y condiciones según legislación local
-5. **Seguridad**: Nunca subas tokens o credenciales a Git. Usa variables de entorno (.env) o variables de Postman
+5. **Seguridad**:
+   - ✅ `.env.local` está en `.gitignore`
+   - ✅ Usa variables de entorno en Netlify para producción
+   - ❌ NUNCA subas tokens o credenciales a Git
+6. **Payphone**:
+   - Autoriza tu dominio en https://developer.payphone.app
+   - Configura URL de respuesta en Payphone Developer
+   - Las variables `NEXT_PUBLIC_*` son públicas (esto es normal para el SDK)
 
-## 🤝 Soporte
+## 🤝 Soporte y Documentación
 
-Para dudas sobre integración de pasarelas o personalización, revisa:
+### Proyecto
+- [QUICK_SETUP_NETLIFY.md](./QUICK_SETUP_NETLIFY.md) - ⚡ Configuración rápida de Netlify (5 min)
+- [NETLIFY_ENV_SETUP.md](./NETLIFY_ENV_SETUP.md) - 📚 Guía completa de variables de entorno
+- [PRODUCTION.md](./PRODUCTION.md) - 🏗️ Guía de deployment completo
+- [PAYPHONE_SDK_CONFIG.md](./PAYPHONE_SDK_CONFIG.md) - 💳 Configuración de Payphone
+- [QUICKSTART.md](./QUICKSTART.md) - 🚀 Inicio rápido
+
+### Servicios externos
 - [Documentación de Next.js](https://nextjs.org/docs)
-- [Documentación de Mercado Pago](https://www.mercadopago.com.ec/developers)
+- [Documentación de Payphone](https://developer.payphone.app/docs)
+- [Documentación de Netlify](https://docs.netlify.com)
+
+### Testing
+```bash
+node test-payphone.js  # Probar conexión con Payphone
+npm run dev            # Desarrollo local
+npm run build          # Build de producción
+```
 
 ## 📄 Licencia
 
