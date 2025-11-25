@@ -1,0 +1,188 @@
+{
+  "info": {
+    "name": "Payphone API - BebéSeguro",
+    "description": "Colección para probar la API de Payphone y el endpoint de confirmación.\n\n**IMPORTANTE**: \n- Configura las variables de entorno en Postman antes de usar\n- NO agregues tokens reales a esta colección\n- Usa variables de entorno para credenciales",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url_payphone",
+      "value": "https://pay.payphonetodoesposible.com",
+      "type": "string"
+    },
+    {
+      "key": "base_url_local",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "base_url_production",
+      "value": "https://tienda-bb-seguro.netlify.app",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Test de Conexión",
+      "item": [
+        {
+          "name": "Test: Confirmar transacción (ID falso)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{PAYPHONE_TOKEN}}",
+                "description": "Token de Payphone"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 999999,\n  \"clientTxId\": \"TEST-{{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_payphone}}/api/button/V2/Confirm",
+              "host": ["{{base_url_payphone}}"],
+              "path": ["api", "button", "V2", "Confirm"]
+            },
+            "description": "Prueba de conexión con Payphone usando un ID de transacción falso.\n\n**Resultado esperado:**\n- Status 404 o mensaje \"Transaction not found\"\n- Esto es NORMAL y significa que la conexión funciona\n\n**Si obtienes:**\n- 401: Token inválido o expirado\n- 403: Acceso denegado\n- 500: Error del servidor"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. API de Payphone (Directa)",
+      "item": [
+        {
+          "name": "Confirmar Transacción Real",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{PAYPHONE_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{transaction_id}},\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_payphone}}/api/button/V2/Confirm",
+              "host": ["{{base_url_payphone}}"],
+              "path": ["api", "button", "V2", "Confirm"]
+            },
+            "description": "Confirma el estado de una transacción real de Payphone.\n\n**Variables requeridas:**\n- `transaction_id`: ID de la transacción devuelto por Payphone\n- `client_transaction_id`: Tu ID único de pedido\n\n**Status codes:**\n- 1: Pendiente\n- 2: Cancelado\n- 3: Aprobado ✅\n- 4: Rechazado"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. API de Tu Aplicación",
+      "item": [
+        {
+          "name": "Confirmar - Local",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{transaction_id}}\",\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_local}}/api/payphone/confirm",
+              "host": ["{{base_url_local}}"],
+              "path": ["api", "payphone", "confirm"]
+            },
+            "description": "Prueba tu endpoint de confirmación en desarrollo local.\n\n**Antes de probar:**\n1. Asegúrate de que `npm run dev` esté corriendo\n2. Las variables de entorno estén en `.env.local`\n3. Tengas un ID de transacción real de Payphone"
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar - Producción",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{transaction_id}}\",\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_production}}/api/payphone/confirm",
+              "host": ["{{base_url_production}}"],
+              "path": ["api", "payphone", "confirm"]
+            },
+            "description": "Prueba tu endpoint de confirmación en producción (Netlify).\n\n**Antes de probar:**\n1. El sitio debe estar deployado en Netlify\n2. Variables de entorno configuradas en Netlify\n3. Tengas un ID de transacción real de Payphone"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Health Check",
+      "item": [
+        {
+          "name": "Check Local Server",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_local}}",
+              "host": ["{{base_url_local}}"]
+            },
+            "description": "Verifica que el servidor local esté corriendo"
+          },
+          "response": []
+        },
+        {
+          "name": "Check Production",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_production}}",
+              "host": ["{{base_url_production}}"]
+            },
+            "description": "Verifica que el sitio en producción esté accesible"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

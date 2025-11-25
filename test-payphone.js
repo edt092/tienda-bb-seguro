@@ -33,8 +33,8 @@ function logSection(title) {
   console.log('='.repeat(60))
 }
 
-async function testPayphoneConnection() {
-  logSection('🧪 TEST DE CONEXIÓN A PAYPHONE')
+async function testPayphoneAPI() {
+  logSection('🧪 TEST DE API DE PAYPHONE')
 
   // 1. Verificar variables de entorno
   logSection('1️⃣  Verificando Variables de Entorno')
@@ -182,9 +182,70 @@ async function testPayphoneConnection() {
   console.log('')
 }
 
-// Ejecutar el test
-testPayphoneConnection().catch(error => {
-  log(`\n❌ Error fatal: ${error.message}`, 'red')
-  console.error(error)
-  process.exit(1)
-})
+// Función para probar endpoint local
+async function testLocalEndpoint() {
+  logSection('5️⃣  Probando Endpoint Local (opcional)')
+
+  log('Este test requiere que el servidor esté corriendo (npm run dev)', 'yellow')
+  log('Si el servidor no está corriendo, este test fallará', 'yellow')
+  log('', 'reset')
+
+  try {
+    const response = await fetch('http://localhost:3000/api/payphone/confirm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        id: '999999',
+        clientTxId: 'TEST-' + Date.now()
+      })
+    })
+
+    const result = await response.json()
+
+    if (response.ok || response.status === 404) {
+      log('✅ Endpoint local responde correctamente', 'green')
+      log(`   Status: ${response.status}`, 'cyan')
+      log('   Respuesta:', 'cyan')
+      console.log(result)
+    } else {
+      log('⚠️  Endpoint local respondió con error:', 'yellow')
+      log(`   Status: ${response.status}`, 'yellow')
+      console.log(result)
+    }
+  } catch (error) {
+    log('⚠️  No se pudo conectar al servidor local', 'yellow')
+    log(`   ${error.message}`, 'yellow')
+    log('   Asegúrate de que el servidor esté corriendo: npm run dev', 'cyan')
+  }
+}
+
+// Función principal
+async function runAllTests() {
+  try {
+    await testPayphoneAPI()
+
+    log('', 'reset')
+    const readline = require('readline').createInterface({
+      input: process.stdin,
+      output: process.stdout
+    })
+
+    readline.question('\n¿Quieres probar el endpoint local? (y/n): ', async (answer) => {
+      if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+        await testLocalEndpoint()
+      }
+      readline.close()
+      log('\n✅ Tests completados', 'green')
+    })
+
+  } catch (error) {
+    log(`\n❌ Error fatal: ${error.message}`, 'red')
+    console.error(error)
+    process.exit(1)
+  }
+}
+
+// Ejecutar los tests
+runAllTests()
