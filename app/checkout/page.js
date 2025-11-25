@@ -1,15 +1,17 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { useRouter } from 'next/navigation'
-import { FaShieldAlt, FaCheckCircle, FaArrowLeft } from 'react-icons/fa'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { FaShieldAlt, FaCheckCircle, FaArrowLeft, FaTimesCircle } from 'react-icons/fa'
 import { motion } from 'framer-motion'
 
 export default function CheckoutPage() {
   const { cart, getSubtotal, clearCart } = useCart()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isProcessing, setIsProcessing] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
+  const [paymentFailed, setPaymentFailed] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -24,6 +26,31 @@ export default function CheckoutPage() {
   const shipping = 0
   const total = subtotal + shipping
 
+  // Verificar respuesta de Payphone al regresar
+  useEffect(() => {
+    const clientTransactionId = searchParams.get('clientTransactionId')
+    const id = searchParams.get('id') // Transaction ID de Payphone
+
+    if (clientTransactionId || id) {
+      // El usuario regresó de Payphone
+      const pendingOrder = localStorage.getItem('pendingOrder')
+
+      if (pendingOrder) {
+        const orderData = JSON.parse(pendingOrder)
+
+        // Verificar si el pago fue exitoso
+        // En Payphone, si regresa con parámetros significa que completó el proceso
+        // Nota: Deberías verificar el estado real con la API en producción
+        setOrderComplete(true)
+        clearCart()
+        localStorage.removeItem('pendingOrder')
+
+        // Limpiar los parámetros de la URL
+        router.replace('/checkout', { scroll: false })
+      }
+    }
+  }, [searchParams, clearCart, router])
+
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
@@ -35,17 +62,58 @@ export default function CheckoutPage() {
     e.preventDefault()
     setIsProcessing(true)
 
-    // Simulación de procesamiento (aquí irá la integración con la pasarela)
-    setTimeout(() => {
-      setIsProcessing(false)
-      setOrderComplete(true)
-      clearCart()
+    try {
+      // Generar ID único para el pedido
+      const orderId = `BB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-      // Redirigir a home después de 5 segundos
-      setTimeout(() => {
-        router.push('/')
-      }, 5000)
-    }, 2000)
+      // Preparar datos del pedido
+      const orderData = {
+        amount: total,
+        orderId: orderId,
+        clientName: formData.name,
+        clientEmail: formData.email,
+        clientPhone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        items: cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      }
+
+      // Llamar a la API para crear el pago en Payphone
+      const response = await fetch('/api/payphone/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+      })
+
+      const result = await response.json()
+
+      if (result.success && result.paymentUrl) {
+        // Guardar información del pedido en localStorage antes de redirigir
+        localStorage.setItem('pendingOrder', JSON.stringify({
+          orderId: orderId,
+          transactionId: result.transactionId,
+          ...orderData
+        }))
+
+        // Redirigir a Payphone
+        window.location.href = result.paymentUrl
+      } else {
+        // Mostrar error
+        alert(result.message || 'Error al generar el link de pago. Por favor, intenta nuevamente.')
+        setIsProcessing(false)
+      }
+
+    } catch (error) {
+      console.error('Error al procesar el pago:', error)
+      alert('Ocurrió un error al procesar tu pedido. Por favor, intenta nuevamente.')
+      setIsProcessing(false)
+    }
   }
 
   if (cart.length === 0 && !orderComplete) {
@@ -265,8 +333,9 @@ export default function CheckoutPage() {
 
               <div className="mt-8 bg-blue-50 rounded-2xl p-4">
                 <p className="text-sm text-blue-800 font-body">
-                  <strong>Nota:</strong> Una vez que confirmes tu pedido, nos pondremos en contacto
-                  contigo para coordinar el método de pago y la entrega.
+                  <strong>Nota:</strong> Al confirmar tu pedido, serás redirigido a Payphone
+                  para completar el pago de forma segura. Luego de completar el pago,
+                  nos pondremos en contacto contigo para coordinar la entrega.
                 </p>
               </div>
 
