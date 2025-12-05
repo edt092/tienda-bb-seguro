@@ -146,13 +146,13 @@ export default function CheckoutPage() {
         console.log('🎨 Renderizando botón de Payphone...')
 
         // Paso 2: Configurar y renderizar el botón de Payphone
+        // IMPORTANTE: NO usar token aquí - el transactionId ya está autenticado por el backend
         window.payphone.Button({
-          token: process.env.NEXT_PUBLIC_PAYPHONE_TOKEN,
           btnHorizontal: true,
           btnCard: true,
           createOrder: function(actions) {
             console.log('📝 createOrder llamado, usando transactionId:', transactionId)
-            // Usar el transactionId que obtuvimos del backend
+            // El transactionId ya viene autenticado del backend
             return actions.prepare({
               transactionId: transactionId
             })
@@ -160,7 +160,7 @@ export default function CheckoutPage() {
           onComplete: function(model) {
             console.log('✅ onComplete llamado:', model)
             setIsProcessing(true)
-            // Verificar el pago en el backend
+            // Verificar el pago en el backend (NUNCA confiar solo en el frontend)
             verificarPagoEnBackend(model.id, model.clientTxId)
           },
           onError: function(error) {
