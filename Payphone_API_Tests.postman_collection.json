@@ -107,7 +107,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{transaction_id}}\",\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
+              "raw": "{\n  \"id\": {{transaction_id}},\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -135,7 +135,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{transaction_id}}\",\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
+              "raw": "{\n  \"id\": {{transaction_id}},\n  \"clientTxId\": \"{{client_transaction_id}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

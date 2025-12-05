@@ -32,13 +32,15 @@ export async function POST(request) {
       )
     }
 
-    const token = process.env.PAYPHONE_TOKEN || process.env.NEXT_PUBLIC_PAYPHONE_TOKEN
+    // IMPORTANTE: Usar variable del servidor (sin NEXT_PUBLIC_)
+    const token = process.env.PAYPHONE_TOKEN
 
     if (!token) {
+      console.error('❌ Token de Payphone no configurado en el servidor')
       return NextResponse.json(
         {
           success: false,
-          error: 'Token de Payphone no configurado'
+          error: 'Token de Payphone no configurado en el servidor'
         },
         { status: 500 }
       )

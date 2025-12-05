@@ -21,14 +21,20 @@ export async function POST(request) {
       )
     }
 
-    const token = process.env.PAYPHONE_TOKEN || process.env.NEXT_PUBLIC_PAYPHONE_TOKEN
-    const storeId = process.env.PAYPHONE_STORE_ID || process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID
+    // IMPORTANTE: Usar variables del servidor (sin NEXT_PUBLIC_)
+    // Las variables NEXT_PUBLIC_ son para el cliente, NO para el backend
+    const token = process.env.PAYPHONE_TOKEN
+    const storeId = process.env.PAYPHONE_STORE_ID
 
     if (!token || !storeId) {
+      console.error('❌ Variables de entorno no configuradas:', {
+        hasToken: !!token,
+        hasStoreId: !!storeId
+      })
       return NextResponse.json(
         {
           success: false,
-          error: 'Credenciales de Payphone no configuradas'
+          error: 'Credenciales de Payphone no configuradas en el servidor'
         },
         { status: 500 }
       )
