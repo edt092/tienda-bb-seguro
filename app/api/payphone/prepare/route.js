@@ -52,6 +52,7 @@ export async function POST(request) {
     })
 
     // Preparar los datos para Payphone - TODOS los montos deben ser enteros en centavos
+    // Objeto base con campos obligatorios
     const payphoneData = {
       amount: amountInCents,                    // Total en centavos
       amountWithTax: taxInCents,                // Valor del impuesto en centavos
@@ -62,11 +63,19 @@ export async function POST(request) {
       currency: "USD",
       clientTransactionId: clientTransactionId,
       storeId: storeId,
-      email: email || '',
-      documentId: documentId || '',
-      phoneNumber: phone || '',
       responseUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/checkout?clientTransactionId=${clientTransactionId}`,
       cancellationUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/checkout?cancelled=true`
+    }
+
+    // Agregar campos opcionales SOLO si tienen valores válidos (no vacíos)
+    if (email && email.trim()) {
+      payphoneData.email = email.trim()
+    }
+    if (documentId && documentId.trim()) {
+      payphoneData.documentId = documentId.trim()
+    }
+    if (phone && phone.trim()) {
+      payphoneData.phoneNumber = phone.trim()
     }
 
     console.log('📤 Enviando a Payphone:', payphoneData)
