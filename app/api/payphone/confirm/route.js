@@ -20,6 +20,18 @@ export async function POST(request) {
       )
     }
 
+    // Convertir id a número entero y validar
+    const transactionId = parseInt(id, 10)
+    if (isNaN(transactionId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'El ID de transacción debe ser un número válido'
+        },
+        { status: 400 }
+      )
+    }
+
     const token = process.env.PAYPHONE_TOKEN || process.env.NEXT_PUBLIC_PAYPHONE_TOKEN
 
     if (!token) {
@@ -33,7 +45,7 @@ export async function POST(request) {
     }
 
     console.log('🔍 Confirmando transacción de Payphone:', {
-      id,
+      id: transactionId,
       clientTxId
     })
 
@@ -45,7 +57,7 @@ export async function POST(request) {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        id: parseInt(id),
+        id: transactionId,  // Número entero validado
         clientTxId: clientTxId
       })
     })

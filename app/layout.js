@@ -32,18 +32,13 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es" className={`${quicksand.variable} ${nunito.variable} ${poppins.variable}`}>
-      <head>
-        <link rel="stylesheet" href="https://cdn.payphonetodoesposible.com/box/v1.1/payphone-payment-box.css" />
-      </head>
       <body className="font-body antialiased">
         <CartProvider>
           {children}
         </CartProvider>
         <Script
-          src="https://cdn.payphonetodoesposible.com/box/v1.1/payphone-payment-box.js"
+          src="https://pay.payphonetodoesposible.com/api/button/js?appId=U4vZUeEhGUqSzQjZfVgL1w"
           strategy="afterInteractive"
-          onLoad={() => console.log('✅ Payphone SDK cargado')}
-          onError={() => console.error('❌ Error cargando Payphone SDK')}
         />
       </body>
     </html>

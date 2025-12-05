@@ -1,19 +1,18 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { FaShieldAlt, FaCheckCircle, FaArrowLeft, FaTimesCircle } from 'react-icons/fa'
 import { motion } from 'framer-motion'
 
 export default function CheckoutPage() {
   const { cart, getSubtotal, clearCart } = useCart()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [isProcessing, setIsProcessing] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
   const [paymentFailed, setPaymentFailed] = useState(false)
-  const [sdkLoading, setSdkLoading] = useState(true)
-  const [sdkError, setSdkError] = useState(null)
+  const [buttonReady, setButtonReady] = useState(false)
+  const [buttonError, setButtonError] = useState(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -28,57 +27,6 @@ export default function CheckoutPage() {
   const shipping = 0
   const total = subtotal + shipping
 
-  // Verificar respuesta de Payphone al regresar
-  useEffect(() => {
-    const clientTransactionId = searchParams.get('clientTransactionId')
-    const id = searchParams.get('id') // Transaction ID de Payphone
-
-    if (clientTransactionId && id) {
-      // El usuario regresó de Payphone - confirmar el estado
-      const confirmTransaction = async () => {
-        try {
-          setIsProcessing(true)
-
-          // Llamar al endpoint de confirmación
-          const response = await fetch('/api/payphone/confirm', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              id: id,
-              clientTxId: clientTransactionId
-            })
-          })
-
-          const result = await response.json()
-
-          if (result.success && result.status === 3) {
-            // Pago aprobado
-            setOrderComplete(true)
-            clearCart()
-            localStorage.removeItem('pendingOrder')
-          } else {
-            // Pago no aprobado (cancelado, rechazado, etc.)
-            setPaymentFailed(true)
-            console.error('Pago no aprobado:', result)
-          }
-
-          // Limpiar los parámetros de la URL
-          router.replace('/checkout', { scroll: false })
-
-        } catch (error) {
-          console.error('Error al confirmar transacción:', error)
-          setPaymentFailed(true)
-        } finally {
-          setIsProcessing(false)
-        }
-      }
-
-      confirmTransaction()
-    }
-  }, [searchParams, clearCart, router])
-
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
@@ -86,11 +34,9 @@ export default function CheckoutPage() {
     })
   }
 
-  // Validar formulario y mostrar botón de pago
-  const [formValid, setFormValid] = useState(false)
-  const [orderId, setOrderId] = useState('')
-
   // Validar formulario
+  const [formValid, setFormValid] = useState(false)
+
   useEffect(() => {
     const isValid = formData.name &&
                    formData.email &&
@@ -100,38 +46,18 @@ export default function CheckoutPage() {
     setFormValid(isValid)
   }, [formData])
 
-  // Inicializar Payphone SDK cuando el formulario es válido
+  // Inicializar Payphone cuando el formulario es válido
   useEffect(() => {
     if (!formValid || typeof window === 'undefined') {
-      setSdkLoading(false)
-      return
-    }
-
-    // Verificar que las variables de entorno estén configuradas
-    const token = process.env.NEXT_PUBLIC_PAYPHONE_TOKEN
-    const storeId = process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID
-
-    console.log('🔍 Verificando configuración de Payphone:')
-    console.log('- Token presente:', !!token)
-    console.log('- Store ID presente:', !!storeId)
-
-    if (!token || !storeId) {
-      console.error('❌ Variables de entorno no configuradas')
-      setSdkError('Variables de entorno de Payphone no configuradas')
-      setSdkLoading(false)
       return
     }
 
     // Generar ID único para el pedido
-    const newOrderId = `BB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    setOrderId(newOrderId)
+    const orderId = `BB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-    // Convertir el total a centavos
-    const amountInCents = Math.round(parseFloat(total) * 100)
-
-    // Guardar información del pedido antes de iniciar el pago
+    // Guardar información del pedido
     localStorage.setItem('pendingOrder', JSON.stringify({
-      orderId: newOrderId,
+      orderId: orderId,
       ...formData,
       amount: total,
       items: cart.map(item => ({
@@ -141,90 +67,153 @@ export default function CheckoutPage() {
       }))
     }))
 
-    // Esperar a que el SDK esté disponible
-    const initPayphone = () => {
-      if (window.PPaymentButtonBox) {
-        try {
-          console.log('🚀 Inicializando SDK de Payphone...')
+    // Función para confirmar el pago
+    const verificarPagoEnBackend = async (id, clientTxId) => {
+      try {
+        console.log('🔍 Verificando pago en backend...', { id, clientTxId })
 
-          // Limpiar el contenedor antes de renderizar
-          const container = document.getElementById('pp-button')
-          if (container) {
-            container.innerHTML = ''
-          }
+        const response = await fetch('/api/payphone/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, clientTxId: clientTxId })
+        })
 
-          // Configurar Payphone SDK
-          const ppb = new window.PPaymentButtonBox({
-            token: token,
-            clientTransactionId: newOrderId,
-            amount: amountInCents,
-            amountWithoutTax: 0,
-            amountWithTax: amountInCents,
-            tax: 0,
-            service: 0,
-            tip: 0,
-            currency: "USD",
-            storeId: storeId,
-            reference: `Pedido BebéSeguro ${newOrderId}`,
-            lang: "es",
-            defaultMethod: "card",
-            phoneNumber: formData.phone,
-            email: formData.email
-          })
+        const data = await response.json()
+        console.log('📥 Respuesta del backend:', data)
 
-          console.log('✅ SDK configurado, renderizando botón...')
-          ppb.render('pp-button')
-          setSdkLoading(false)
-          setSdkError(null)
-          console.log('✅ Botón de Payphone renderizado exitosamente')
-        } catch (error) {
-          console.error('❌ Error al inicializar Payphone:', error)
-          setSdkError(error.message)
-          setSdkLoading(false)
+        if (data.success && data.status === 3) {
+          // Pago aprobado
+          console.log('✅ Pago aprobado!')
+          setOrderComplete(true)
+          clearCart()
+          localStorage.removeItem('pendingOrder')
+        } else {
+          // Pago no aprobado
+          console.log('❌ Pago no aprobado:', data.statusMessage)
+          setPaymentFailed(true)
         }
-      } else {
-        console.warn('⏳ SDK de Payphone aún no está disponible')
+      } catch (error) {
+        console.error('❌ Error al verificar pago:', error)
+        setPaymentFailed(true)
+      } finally {
+        setIsProcessing(false)
       }
     }
 
-    // Verificar si el SDK ya está cargado
-    if (window.PPaymentButtonBox) {
-      console.log('✅ SDK de Payphone ya está disponible')
-      initPayphone()
-    } else {
-      console.log('⏳ Esperando a que se cargue el SDK de Payphone...')
-      setSdkLoading(true)
+    // Función para inicializar el botón de Payphone
+    const initPayphoneButton = async () => {
+      try {
+        console.log('🚀 Iniciando preparación de transacción...')
+        setButtonReady(false)
+        setButtonError(null)
 
-      // Esperar un poco más para que el script se cargue
-      const checkInterval = setInterval(() => {
-        if (window.PPaymentButtonBox) {
-          console.log('✅ SDK de Payphone detectado')
-          clearInterval(checkInterval)
-          initPayphone()
+        // Paso 1: Preparar la transacción en el backend
+        const prepareResponse = await fetch('/api/payphone/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: total,
+            clientTransactionId: orderId,
+            email: formData.email,
+            phone: formData.phone
+          })
+        })
+
+        if (!prepareResponse.ok) {
+          throw new Error('Error al preparar la transacción')
+        }
+
+        const prepareData = await prepareResponse.json()
+        console.log('✅ Transacción preparada:', prepareData)
+
+        if (!prepareData.success || !prepareData.transactionId) {
+          throw new Error('No se recibió el ID de transacción')
+        }
+
+        const transactionId = prepareData.transactionId
+
+        // Verificar que el SDK esté disponible
+        if (!window.payphone) {
+          throw new Error('SDK de Payphone no está disponible')
+        }
+
+        // Limpiar el contenedor
+        const container = document.getElementById('pp-button')
+        if (container) {
+          container.innerHTML = ''
+        }
+
+        console.log('🎨 Renderizando botón de Payphone...')
+
+        // Paso 2: Configurar y renderizar el botón de Payphone
+        window.payphone.Button({
+          token: process.env.NEXT_PUBLIC_PAYPHONE_TOKEN,
+          btnHorizontal: true,
+          btnCard: true,
+          createOrder: function(actions) {
+            console.log('📝 createOrder llamado, usando transactionId:', transactionId)
+            // Usar el transactionId que obtuvimos del backend
+            return actions.prepare({
+              transactionId: transactionId
+            })
+          },
+          onComplete: function(model) {
+            console.log('✅ onComplete llamado:', model)
+            setIsProcessing(true)
+            // Verificar el pago en el backend
+            verificarPagoEnBackend(model.id, model.clientTxId)
+          },
+          onError: function(error) {
+            console.error('❌ Error en Payphone:', error)
+            setPaymentFailed(true)
+          }
+        }).render('#pp-button')
+
+        console.log('✅ Botón renderizado exitosamente')
+        setButtonReady(true)
+
+      } catch (error) {
+        console.error('❌ Error al inicializar botón:', error)
+        setButtonError(error.message)
+      }
+    }
+
+    // Esperar a que el SDK de Payphone esté disponible
+    const checkPayphone = () => {
+      if (window.payphone) {
+        console.log('✅ SDK de Payphone disponible')
+        initPayphoneButton()
+      } else {
+        console.log('⏳ Esperando SDK de Payphone...')
+      }
+    }
+
+    if (window.payphone) {
+      checkPayphone()
+    } else {
+      const interval = setInterval(() => {
+        if (window.payphone) {
+          clearInterval(interval)
+          checkPayphone()
         }
       }, 200)
 
-      // Timeout después de 10 segundos
       const timeout = setTimeout(() => {
-        clearInterval(checkInterval)
-        if (!window.PPaymentButtonBox) {
-          console.error('❌ Timeout: SDK de Payphone no se cargó en 10 segundos')
-          setSdkError('El SDK de Payphone no se pudo cargar. Por favor recarga la página.')
-          setSdkLoading(false)
+        clearInterval(interval)
+        if (!window.payphone) {
+          setButtonError('El SDK de Payphone no se pudo cargar. Por favor recarga la página.')
         }
       }, 10000)
 
       return () => {
-        clearInterval(checkInterval)
+        clearInterval(interval)
         clearTimeout(timeout)
       }
     }
-  }, [formValid, formData, total, cart])
+  }, [formValid, formData, total, cart, clearCart])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    // La validación ya se hace automáticamente con useEffect
-    // El botón de Payphone aparecerá cuando el formulario sea válido
   }
 
   if (cart.length === 0 && !orderComplete) {
@@ -364,10 +353,6 @@ export default function CheckoutPage() {
           >
             Volver al Inicio
           </button>
-
-          <p className="text-sm text-gray-500 mt-4">
-            Serás redirigido automáticamente en 5 segundos...
-          </p>
         </motion.div>
       </div>
     )
@@ -503,7 +488,6 @@ export default function CheckoutPage() {
                 <p className="text-sm text-blue-800 font-body">
                   <strong>Nota:</strong> Completa el formulario para proceder al pago.
                   El pago se procesa de forma segura con Payphone.
-                  Luego de completar el pago, nos pondremos en contacto contigo para coordinar la entrega.
                 </p>
               </div>
 
@@ -515,23 +499,22 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Mensajes de estado del SDK */}
-              {formValid && sdkLoading && (
+              {formValid && !buttonReady && !buttonError && (
                 <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200 flex items-center gap-3">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                   <p className="text-sm text-blue-800 font-body">
-                    Cargando métodos de pago...
+                    Preparando métodos de pago...
                   </p>
                 </div>
               )}
 
-              {formValid && sdkError && (
+              {buttonError && (
                 <div className="mt-6 bg-red-50 rounded-xl p-4 border border-red-200">
                   <p className="text-sm text-red-800 font-body font-semibold mb-2">
                     ❌ Error al cargar el botón de pago
                   </p>
                   <p className="text-xs text-red-700 font-body mb-3">
-                    {sdkError}
+                    {buttonError}
                   </p>
                   <button
                     type="button"
@@ -544,9 +527,20 @@ export default function CheckoutPage() {
               )}
 
               {/* Contenedor del botón de Payphone */}
-              <div className="mt-6">
-                <div id="pp-button"></div>
-              </div>
+              {formValid && (
+                <div className="mt-6">
+                  <div id="pp-button"></div>
+                </div>
+              )}
+
+              {isProcessing && (
+                <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <p className="text-sm text-blue-800 font-body">
+                    Verificando tu pago...
+                  </p>
+                </div>
+              )}
             </form>
           </div>
 
