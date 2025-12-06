@@ -18,6 +18,8 @@ export default function CheckoutPage() {
     name: '',
     email: '',
     phone: '',
+    documentId: '',
+    identificationType: '1', // 1: Cédula, 2: RUC, 3: Pasaporte
     address: '',
     city: 'Quito',
     notes: ''
@@ -41,6 +43,7 @@ export default function CheckoutPage() {
     const isValid = formData.name &&
                    formData.email &&
                    formData.phone &&
+                   formData.documentId &&
                    formData.address &&
                    formData.city
     setFormValid(isValid)
@@ -49,6 +52,19 @@ export default function CheckoutPage() {
   // Inicializar Payphone cuando el formulario es válido
   useEffect(() => {
     if (!formValid || typeof window === 'undefined') {
+      return
+    }
+
+    // Verificar parámetros de respuesta en la URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const transactionId = urlParams.get('id')
+    const clientTxId = urlParams.get('clientTxId')
+
+    // Si hay parámetros de respuesta, verificar el pago
+    if (transactionId && clientTxId) {
+      console.log('🔍 Parámetros de respuesta detectados:', { transactionId, clientTxId })
+      setIsProcessing(true)
+      verificarPagoEnBackend(parseInt(transactionId), clientTxId)
       return
     }
 
@@ -100,41 +116,24 @@ export default function CheckoutPage() {
       }
     }
 
-    // Función para inicializar el botón de Payphone
+    // Función para inicializar la Cajita de Pagos de Payphone
     const initPayphoneButton = async () => {
       try {
-        console.log('🚀 Iniciando preparación de transacción...')
+        console.log('🚀 Iniciando Cajita de Pagos de Payphone...')
         setButtonReady(false)
         setButtonError(null)
 
-        // Paso 1: Preparar la transacción en el backend
-        const prepareResponse = await fetch('/api/payphone/prepare', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: total,
-            clientTransactionId: orderId,
-            email: formData.email,
-            phone: formData.phone
-          })
-        })
-
-        if (!prepareResponse.ok) {
-          throw new Error('Error al preparar la transacción')
-        }
-
-        const prepareData = await prepareResponse.json()
-        console.log('✅ Transacción preparada:', prepareData)
-
-        if (!prepareData.success || !prepareData.transactionId) {
-          throw new Error('No se recibió el ID de transacción')
-        }
-
-        const transactionId = prepareData.transactionId
-
         // Verificar que el SDK esté disponible
-        if (!window.payphone) {
-          throw new Error('SDK de Payphone no está disponible')
+        if (!window.PPaymentButtonBox) {
+          throw new Error('SDK de Payphone (Cajita de Pagos) no está disponible')
+        }
+
+        // Verificar que las variables de entorno estén configuradas
+        const token = process.env.NEXT_PUBLIC_PAYPHONE_TOKEN
+        const storeId = process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID
+
+        if (!token || !storeId) {
+          throw new Error('Credenciales de Payphone no configuradas. Verifica las variables NEXT_PUBLIC_PAYPHONE_TOKEN y NEXT_PUBLIC_PAYPHONE_STORE_ID')
         }
 
         // Limpiar el contenedor
@@ -143,56 +142,75 @@ export default function CheckoutPage() {
           container.innerHTML = ''
         }
 
-        console.log('🎨 Renderizando botón de Payphone...')
+        console.log('🎨 Renderizando Cajita de Pagos...')
 
-        // Paso 2: Configurar y renderizar el botón de Payphone
-        // IMPORTANTE: NO usar token aquí - el transactionId ya está autenticado por el backend
-        window.payphone.Button({
-          btnHorizontal: true,
-          btnCard: true,
-          createOrder: function(actions) {
-            console.log('📝 createOrder llamado, usando transactionId:', transactionId)
-            // El transactionId ya viene autenticado del backend
-            return actions.prepare({
-              transactionId: transactionId
-            })
-          },
-          onComplete: function(model) {
-            console.log('✅ onComplete llamado:', model)
-            setIsProcessing(true)
-            // Verificar el pago en el backend (NUNCA confiar solo en el frontend)
-            verificarPagoEnBackend(model.id, model.clientTxId)
-          },
-          onError: function(error) {
-            console.error('❌ Error en Payphone:', error)
-            setPaymentFailed(true)
-          }
-        }).render('#pp-button')
+        // Calcular montos en centavos (Payphone requiere enteros)
+        const amountInCents = Math.round(total * 100) // Ej: 19.49 -> 1949
 
-        console.log('✅ Botón renderizado exitosamente')
+        // Calcular valores sin y con impuestos (12% IVA) - en centavos
+        const taxPercentage = 0.12
+        const amountWithoutTaxInCents = Math.round(amountInCents / (1 + taxPercentage))
+        const taxInCents = amountInCents - amountWithoutTaxInCents
+
+        console.log('💰 Desglose de montos para Payphone:', {
+          total_usd: total,
+          amount: amountInCents, // Total en centavos
+          amountWithoutTax: 0, // Productos exentos (ninguno)
+          amountWithTax: amountWithoutTaxInCents, // Base imponible
+          tax: taxInCents, // Valor del impuesto
+          formula: `${amountInCents} = 0 + ${amountWithoutTaxInCents} + ${taxInCents}`
+        })
+
+        // Configurar y renderizar la Cajita de Pagos
+        const ppb = new window.PPaymentButtonBox({
+          token: token,
+          clientTransactionId: orderId, // ID único de tu tienda
+          amount: amountInCents, // Valor TOTAL en centavos (ej: 1949)
+          amountWithoutTax: 0, // Parte del total que NO lleva impuesto (productos exentos)
+          amountWithTax: amountWithoutTaxInCents, // Base imponible en centavos (ej: 1740)
+          tax: taxInCents, // Valor del impuesto en centavos (ej: 209)
+          service: 0,
+          tip: 0,
+          currency: "USD",
+          storeId: storeId,
+          reference: `Pedido BebéSeguro #${orderId}`,
+          responseUrl: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/checkout`,
+          cancellationUrl: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/checkout?cancelled=true`,
+          lang: "es",
+          defaultMethod: "card",
+          timeZone: -5,
+          phoneNumber: formData.phone,
+          email: formData.email,
+          documentId: formData.documentId,
+          identificationType: parseInt(formData.identificationType)
+        })
+
+        ppb.render('pp-button')
+
+        console.log('✅ Cajita de Pagos renderizada exitosamente')
         setButtonReady(true)
 
       } catch (error) {
-        console.error('❌ Error al inicializar botón:', error)
+        console.error('❌ Error al inicializar Cajita de Pagos:', error)
         setButtonError(error.message)
       }
     }
 
     // Esperar a que el SDK de Payphone esté disponible
     const checkPayphone = () => {
-      if (window.payphone) {
-        console.log('✅ SDK de Payphone disponible')
+      if (window.PPaymentButtonBox) {
+        console.log('✅ SDK de Payphone (Cajita de Pagos) disponible')
         initPayphoneButton()
       } else {
         console.log('⏳ Esperando SDK de Payphone...')
       }
     }
 
-    if (window.payphone) {
+    if (window.PPaymentButtonBox) {
       checkPayphone()
     } else {
       const interval = setInterval(() => {
-        if (window.payphone) {
+        if (window.PPaymentButtonBox) {
           clearInterval(interval)
           checkPayphone()
         }
@@ -200,8 +218,8 @@ export default function CheckoutPage() {
 
       const timeout = setTimeout(() => {
         clearInterval(interval)
-        if (!window.payphone) {
-          setButtonError('El SDK de Payphone no se pudo cargar. Por favor recarga la página.')
+        if (!window.PPaymentButtonBox) {
+          setButtonError('El SDK de Payphone (Cajita de Pagos) no se pudo cargar. Por favor recarga la página.')
         }
       }, 10000)
 
@@ -434,6 +452,50 @@ export default function CheckoutPage() {
                       placeholder="+593 99 123 4567"
                     />
                   </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 font-body font-semibold mb-2">
+                      Tipo de Identificación *
+                    </label>
+                    <select
+                      name="identificationType"
+                      value={formData.identificationType}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-pink-400 focus:outline-none transition-colors"
+                    >
+                      <option value="1">Cédula</option>
+                      <option value="2">RUC</option>
+                      <option value="3">Pasaporte</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-body font-semibold mb-2">
+                      Número de Identificación *
+                    </label>
+                    <input
+                      type="text"
+                      name="documentId"
+                      value={formData.documentId}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-pink-400 focus:outline-none transition-colors"
+                      placeholder="1234567890"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <p className="text-xs text-blue-700 font-body flex items-start gap-2">
+                    <span className="text-blue-500 mt-0.5">ℹ️</span>
+                    <span>
+                      Tus datos de identificación se utilizan para generar la guía de envío.
+                      Por favor, asegúrate de que sean correctos y estén actualizados.
+                    </span>
+                  </p>
                 </div>
 
                 <div>
